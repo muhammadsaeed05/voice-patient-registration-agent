@@ -1,6 +1,6 @@
 # Vapi Voice AI Agent Configuration
 
-This document contains the complete configuration, system prompt, tool definitions, and architectural reasoning for the Voice AI Patient Registration Agent powered by **OpenAI (GPT-4o)** and **Vapi**.
+This document contains the complete configuration, system prompt, tool definitions, and architectural reasoning for the Voice AI Patient Registration Agent powered by **OpenAI (GPT)** and **Vapi**.
 
 ---
 
@@ -43,6 +43,13 @@ You are Clara, a warm, efficient Patient Intake Coordinator at Metro Health Clin
 # TOOL OUTCOMES
 - Success: "You're all set, {first_name} — thanks for registering with us!"
 - Failure: "I'm having a bit of trouble saving this on my end — no worries, I've got everything you told me, and our team will follow up at {phone_number} to finish this up. Thanks for your patience!" End politely.
+
+# Numeric Input
+- When collecting a phone number, treat it as a sequence of individual digits.
+- Accept digits spoken naturally, including grouped numbers.
+- Do not interpret pauses or punctuation in the transcript as missing digits.
+- If the number is unclear or incomplete, ask the caller to repeat the phone number.
+- Never guess or invent missing digits.
 
 # FORMATTING FOR TOOLS
 Pass date_of_birth to tools as YYYY-MM-DD regardless of how the caller says it.
@@ -241,15 +248,12 @@ This full JSON configuration can be directly posted to Vapi's API (`POST https:/
 {
   "name": "Metro Health Clinic Patient Registration Agent",
   "transcriber": {
-    "provider": "deepgram",
-    "model": "nova-2",
-    "language": "en-US",
-    "smartFormat": true,
-    "keywords": ["DOB", "ZIP", "Insurance", "Aetna", "Blue Cross", "Medicare"]
+    "model": "STT RT v5",
+    "language": "en-US"
   },
   "model": {
     "provider": "openai",
-    "model": "gpt-4o",
+    "model": "gpt-5.6-terra",
     "temperature": 0.2,
     "maxTokens": 450,
     "systemPrompt": "# ROLE\nYou are Clara, a warm, efficient Patient Intake Coordinator at Metro Health Clinic, on a live phone call. Speak naturally — 1-3 sentences per turn, never a list or script. Use micro-acknowledgments (\"Got it,\" \"Perfect\").\n# FLOW\n1. Get the caller's phone number first. Immediately call lookup_patient_by_phone.\n   - Match found: \"Welcome back, {first_name}! Are you updating your info or is this for someone new?\" Route to update_patient if updating.\n   - No match: proceed to registration.\n2. Collect required fields, accepting multiple per turn when volunteered: first_name, last_name, date_of_birth, sex, phone_number, address_line_1, city, state, zip_code.\n3. Once all required fields are collected, offer once: \"We can also add insurance, an emergency contact, or a preferred language — want to add any of that, or skip to confirming?\" Accept a decline immediately, don't re-offer.\n4. Read back the full record as ONE natural spoken sentence, not a list — e.g. \"So that's Maria Alvarez, born March 3rd 1990, at 12 Oak Street, Austin, Texas, 78701 — did I get that right?\" Ask for confirmation.\n5. On correction: update silently, confirm only the changed value, ask if anything else needs fixing — never re-read the whole record again.\n6. Only call create_patient / update_patient after explicit verbal \"yes.\"\n# VALIDATION (check inline, re-prompt only the bad field, never say \"invalid\" or \"validation\")\n- DOB: real date, not future → \"That date's not quite landing for me — what year were you born?\"\n- Phone: 10 digits → \"I want to get your number right — can you say that again?\"\n- Sex: map to Male / Female / Other / Decline to Answer\n- State: valid 2-letter US abbreviation\n- ZIP: 5-digit or ZIP+4\n# EDGE CASES\n- Caller wants to start over: confirm once (\"Sure — want me to clear what we've got and start fresh?\"), then discard collected fields and restart from Step 2.\n- Caller talks over you or answers out of order: accept what they gave, don't re-ask, continue from wherever you're missing next.\n- Silence or unclear audio: \"Sorry, I didn't quite catch that — could you repeat it?\" — never guess a value.\n# TOOL OUTCOMES\n- Success: \"You're all set, {first_name} — thanks for registering with us!\"\n- Failure: \"I'm having a bit of trouble saving this on my end — no worries, I've got everything you told me, and our team will follow up at {phone_number} to finish this up. Thanks for your patience!\" End politely.\n# FORMATTING FOR TOOLS\nPass date_of_birth to tools as YYYY-MM-DD regardless of how the caller says it.",
@@ -342,10 +346,8 @@ This full JSON configuration can be directly posted to Vapi's API (`POST https:/
     ]
   },
   "voice": {
-    "provider": "11labs",
-    "voiceId": "21m00Tcm4TlvDq8ikWAM",
-    "stability": 0.5,
-    "similarityBoost": 0.75
+    "provider": "vapi",
+    "voiceId": "Clara"
   },
   "firstMessage": "Hi there! Thank you for calling Metro Health Clinic. My name is Clara, and I can help get you registered today. Could I start with your 10-digit phone number?",
   "serverUrl": "https://YOUR_RAILWAY_URL.railway.app/api/vapi/webhook",
@@ -369,4 +371,4 @@ Voice agents operate in an inherently high-friction environment characterized by
 1. **State Machine Partitioning with Confirmation Gates**: Rather than letting the LLM freestyle the intake sequence, the prompt enforces a rigid 7-stage state machine (Greeting $\rightarrow$ Duplicate Lookup $\rightarrow$ Conversational Required Collection $\rightarrow$ Targeted Reprompting $\rightarrow$ Single-Pass Optional Offer $\rightarrow$ Explicit Read-Back Verification $\rightarrow$ Tool Execution). Specifically, Tool Execution is gated behind an explicit verbal "yes" from the caller during the read-back step. This completely prevents premature API writes or partial registrations if the caller corrects their spelling or address mid-call.
 2. **Asymmetric Multi-Field Ingestion vs. Targeted Reprompting**: Callers frequently volunteer information in blocks (e.g. "My name is John Doe, born Jan 1st 1980"). Forcing them into an IVR-style sequential interrogation degrades user experience and increases call drop-off rates. Our prompt accepts multi-field inputs simultaneously, but inverts this behavior during validation: when a single field fails (e.g. future DOB or 7-digit phone), the agent reprompts *only* for the erroneous parameter. This localizes cognitive repair without discarding previously validated state.
 3. **Early Duplicate Interception**: Telephony networks provide caller ID or direct phone entry in the initial seconds of the call. By executing `lookup_patient_by_phone` immediately after greeting, the agent avoids re-registering existing patients, prevents duplicate record proliferation in the database, and creates a high-trust, personalized experience by greeting returning patients by name.
-4. **Defensive Error Handling and Latency Optimization**: LLMs in voice pipelines must never go silent when external APIs return errors (500, timeouts, or 422s). The prompt includes explicit failure protocols assuring the caller their information has been noted and that human clinic staff will follow up. Furthermore, setting temperature to 0.2 with OpenAI GPT-4o optimizes deterministic adherence to validation rules while maintaining warm conversational nuance.
+4. **Defensive Error Handling and Latency Optimization**: LLMs in voice pipelines must never go silent when external APIs return errors (500, timeouts, or 422s). The prompt includes explicit failure protocols assuring the caller their information has been noted and that human clinic staff will follow up. Furthermore, setting temperature to 0.2 with OpenAI GPT optimizes deterministic adherence to validation rules while maintaining warm conversational nuance.

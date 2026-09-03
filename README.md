@@ -1,6 +1,6 @@
 # Voice AI Agent — Patient Registration System
 
-A voice-based patient intake and registration system designed for healthcare clinics. Callers can register as new patients or update existing medical records conversationally over the phone. The system combines telephony orchestration, real-time speech processing, and LLM reasoning (**Vapi**, **Deepgram**, **ElevenLabs**, and **OpenAI GPT-4o**) with a **FastAPI** backend service and persistent **SQLite** storage running in WAL mode.
+A voice-based patient intake and registration system designed for healthcare clinics. Callers can register as new patients or update existing medical records conversationally over the phone. The system combines telephony orchestration, real-time speech processing, and LLM reasoning (**Vapi**, **STT RT v5**, **Clara from Vapi**, and **OpenAI GPT**) with a **FastAPI** backend service and persistent **SQLite** storage running in WAL mode.
 
 ---
 
@@ -22,7 +22,7 @@ Patient intake over the phone is traditionally labor-intensive, error-prone, and
 
 ## Key Features
 
-* **Real Telephony & Low-Latency Voice Pipeline**: Inbound SIP/PSTN call handling via Vapi, real-time speech-to-text via Deepgram Nova-2, conversational reasoning via OpenAI GPT-4o, and text-to-speech via ElevenLabs.
+* **Real Telephony & Low-Latency Voice Pipeline**: Inbound SIP/PSTN call handling via Vapi, real-time speech-to-text via STT RT v5, conversational reasoning via OpenAI GPT, and text-to-speech via Clara from Vapi.
 * **Structured Function Calling**: Bidirectional tool integration between the voice agent and FastAPI backend supporting both direct tool endpoints (`/tools/*`) and universal Vapi webhook dispatch (`/api/vapi/webhook`).
 * **Server-Side Validation**: Strict Pydantic v2 and SQLModel validation enforcing North American Numbering Plan (NANP) phone formats, valid non-future dates of birth (1900–present), 2-letter U.S. postal abbreviations, 5-digit / ZIP+4 codes, and ISO/US date strings.
 * **Database Mutation Safeguard**: The LLM is strictly instructed never to invoke creation or update tools without explicit caller confirmation.
@@ -39,7 +39,7 @@ The system consists of five distinct, known components communicating over standa
 ```mermaid
 flowchart LR
     Caller([Caller]) <-->|Voice Call| Vapi[Vapi Voice AI]
-    Vapi <-->|LLM & Tools| OpenAI[OpenAI GPT-4o]
+    Vapi <-->|LLM & Tools| OpenAI[OpenAI GPT]
     Vapi -->|HTTP Tool Calls| FastAPI[FastAPI Backend]
     FastAPI <-->|SQLModel / WAL| SQLite[(SQLite Database)]
     Staff([Clinical Staff]) -.->|REST API /patients| FastAPI
@@ -48,8 +48,8 @@ flowchart LR
 ### Component Responsibilities
 
 1. **Caller**: Interacts with the clinic intake system over a live telephone call.
-2. **Vapi (Voice AI)**: Manages telephony connection, streaming speech-to-text, audio synthesis, and tool call dispatching.
-3. **OpenAI GPT-4o (LLM)**: Governs conversational reasoning, extracts demographic fields from natural speech, and triggers tool calls.
+2. **Vapi (Voice AI)**: Manages telephony connection, streaming speech-to-text (STT RT v5), audio synthesis (Clara), and tool call dispatching.
+3. **OpenAI GPT (LLM)**: Governs conversational reasoning, extracts demographic fields from natural speech, and triggers tool calls.
 4. **FastAPI Backend (`app/`)**: Receives tool webhooks (`/tools/*`, `/api/vapi/webhook`) and administrative REST requests (`/patients`, `/health`), enforcing server-side validation.
 5. **SQLite Database (`patients.db`)**: Stores patient records with UUIDv4 identifiers, timestamps, and soft-delete markers, configured in Write-Ahead Logging (`PRAGMA journal_mode=WAL`) mode.
 
@@ -107,9 +107,9 @@ sequenceDiagram
 | **Data Validation** | **Pydantic** | `>=2.13.5` | Fast C-based validation engine for strict runtime type enforcement, regex validation, and normalization. |
 | **Database** | **SQLite (WAL Mode)** | `3.x` | Zero-latency local storage configured with Write-Ahead Logging (`PRAGMA journal_mode=WAL`) and `PRAGMA synchronous=NORMAL` for concurrent reads and writes without file locks. Persisted via volume mount in production. |
 | **Voice Platform** | **Vapi** | Webhook API | Complete telephony orchestrator managing WebRTC/SIP, low-latency audio streaming, turn-taking, silence detection, and LLM tool execution. |
-| **Speech-to-Text** | **Deepgram Nova-2** | `en-US` | Industry-leading transcription speed and accuracy with domain-specific keyword prompting for clinical terms. |
-| **Text-to-Speech** | **ElevenLabs** | Voice ID `21m00Tcm4TlvDq8ikWAM` | Warm, human-sounding synthesis with tunable stability and similarity boost. |
-| **LLM Reasoning** | **OpenAI GPT-4o** | Temperature `0.2` | High adherence to system prompts, precise JSON schema extraction, and deterministic tool invocation. |
+| **Speech-to-Text** | **STT RT v5** | Real-time | Ultra-low-latency transcription optimized for real-time conversational streaming and clinical terms. |
+| **Text-to-Speech** | **Clara (Vapi Voice)** | Vapi Native Voice | Warm, natural-sounding synthesis with conversational pacing and clarity. |
+| **LLM Reasoning** | **OpenAI GPT** | Temperature `0.2` | High adherence to system prompts, precise JSON schema extraction, and deterministic tool invocation. |
 | **Testing** | **pytest** + **httpx** | `>=9.1.1` / `>=0.28.1` | Automated test suite using `TestClient` and in-memory SQLite isolation. |
 | **Containerization** | **Docker** | `python:3.12-slim` | Minimal single-stage container image. |
 | **Cloud Deployment** | **Railway** | Persistent Volume Mount | Docker-based deployment with persistent volume mounted at `/app/data` to retain SQLite databases across deployments. |
