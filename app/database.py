@@ -3,6 +3,8 @@ import logging
 from pathlib import Path
 from typing import Generator
 
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from .config import settings
@@ -36,6 +38,15 @@ effective_db_url = _prepare_db_path(settings.DATABASE_URL)
 
 connect_args = {"check_same_thread": False} if effective_db_url.startswith("sqlite") else {}
 engine = create_engine(effective_db_url, echo=False, connect_args=connect_args)
+
+# Enable WAL mode on SQLite connections for high-concurrency read/write performance
+if effective_db_url.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
 
 
 def get_session() -> Generator[Session, None, None]:
@@ -100,7 +111,6 @@ def seed_database(session: Session) -> None:
 
 def create_db_and_tables() -> None:
     """Create all SQLModel tables and seed initial data."""
-    _prepare_db_path(settings.DATABASE_URL)
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         seed_database(session)

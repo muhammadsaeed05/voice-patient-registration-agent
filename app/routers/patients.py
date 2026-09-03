@@ -13,6 +13,7 @@ from ..models import (
     PatientRead,
     PatientUpdate,
     normalize_us_phone,
+    validate_dob,
 )
 from ..schemas import ResponseEnvelope, SoftDeleteData
 
@@ -54,23 +55,14 @@ def list_patients(
         query = query.where(func.lower(Patient.last_name) == last_name.strip().lower())
 
     if date_of_birth:
-        dob_str = date_of_birth.strip()
-        parsed_dob = None
         try:
-            parsed_dob = date.fromisoformat(dob_str)
-        except ValueError:
-            for fmt in ("%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d"):
-                try:
-                    parsed_dob = datetime.strptime(dob_str, fmt).date()
-                    break
-                except ValueError:
-                    continue
-        if parsed_dob is None:
+            parsed_dob = validate_dob(date_of_birth)
+            query = query.where(Patient.date_of_birth == parsed_dob)
+        except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="date_of_birth must be a valid date in MM/DD/YYYY or YYYY-MM-DD format",
+                detail=f"Invalid date_of_birth query parameter: {str(e)}",
             )
-        query = query.where(Patient.date_of_birth == parsed_dob)
 
     if phone_number:
         try:

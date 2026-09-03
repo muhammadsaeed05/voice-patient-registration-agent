@@ -20,6 +20,11 @@ VALID_US_STATES = {
 NAME_REGEX = re.compile(r"^[a-zA-Z' -]{1,50}$")
 ZIP_REGEX = re.compile(r"^\d{5}(-\d{4})?$")
 
+REQUIRED_FIELDS = {
+    "first_name", "last_name", "date_of_birth", "sex",
+    "phone_number", "address_line_1", "city", "state", "zip_code"
+}
+
 
 def normalize_us_phone(v: Any, required: bool = True) -> Optional[str]:
     """Normalize and validate a 10-digit US phone number."""
@@ -41,11 +46,10 @@ def normalize_us_phone(v: Any, required: bool = True) -> Optional[str]:
     return digits
 
 
-def validate_name_field(v: Any, field_name: str, required: bool = True) -> Optional[str]:
+def validate_name(v: Any, field_name: str = "name") -> str:
+    """Validate first or last name (1-50 chars, letters/hyphens/apostrophes/spaces)."""
     if v is None:
-        if required:
-            raise ValueError(f"{field_name} is required")
-        return None
+        raise ValueError(f"{field_name} is required")
     s = str(v).strip()
     if not (1 <= len(s) <= 50):
         raise ValueError(f"{field_name} must be between 1 and 50 characters")
@@ -56,10 +60,9 @@ def validate_name_field(v: Any, field_name: str, required: bool = True) -> Optio
     return s
 
 
-def validate_dob(v: Any, required: bool = True) -> Optional[date]:
+def validate_dob(v: Any) -> Optional[date]:
+    """Validate date of birth, supporting ISO and US date string formats."""
     if v is None:
-        if required:
-            raise ValueError("date_of_birth is required")
         return None
     if isinstance(v, str):
         v_str = v.strip()
@@ -89,15 +92,13 @@ def validate_dob(v: Any, required: bool = True) -> Optional[date]:
     return v
 
 
-def validate_sex(v: Any, required: bool = True) -> Optional["SexEnum"]:
+def validate_sex(v: Any) -> "SexEnum":
+    """Validate administrative sex, case-insensitive for voice input."""
     if v is None:
-        if required:
-            raise ValueError("sex is required")
-        return None
+        raise ValueError("sex is required")
     if isinstance(v, SexEnum):
         return v
     s = str(v).strip()
-    # Case-insensitive matching for friendly voice parsing
     for member in SexEnum:
         if member.value.lower() == s.lower():
             return member
@@ -105,33 +106,10 @@ def validate_sex(v: Any, required: bool = True) -> Optional["SexEnum"]:
     raise ValueError(f"sex must be one of: {valid_options}")
 
 
-def validate_address_line_1(v: Any, required: bool = True) -> Optional[str]:
+def validate_state(v: Any) -> str:
+    """Validate 2-letter US state postal abbreviation."""
     if v is None:
-        if required:
-            raise ValueError("address_line_1 is required")
-        return None
-    s = str(v).strip()
-    if not s:
-        raise ValueError("address_line_1 cannot be empty")
-    return s
-
-
-def validate_city(v: Any, required: bool = True) -> Optional[str]:
-    if v is None:
-        if required:
-            raise ValueError("city is required")
-        return None
-    s = str(v).strip()
-    if not (1 <= len(s) <= 100):
-        raise ValueError("city must be between 1 and 100 characters")
-    return s
-
-
-def validate_state(v: Any, required: bool = True) -> Optional[str]:
-    if v is None:
-        if required:
-            raise ValueError("state is required")
-        return None
+        raise ValueError("state is required")
     s = str(v).strip().upper()
     if s not in VALID_US_STATES:
         raise ValueError(
@@ -140,11 +118,10 @@ def validate_state(v: Any, required: bool = True) -> Optional[str]:
     return s
 
 
-def validate_zip(v: Any, required: bool = True) -> Optional[str]:
+def validate_zip(v: Any) -> str:
+    """Validate 5-digit US ZIP code or 9-digit ZIP+4."""
     if v is None:
-        if required:
-            raise ValueError("zip_code is required")
-        return None
+        raise ValueError("zip_code is required")
     s = str(v).strip()
     if not ZIP_REGEX.match(s):
         raise ValueError(
@@ -154,6 +131,7 @@ def validate_zip(v: Any, required: bool = True) -> Optional[str]:
 
 
 def validate_email_field(v: Any) -> Optional[str]:
+    """Validate email address format if provided."""
     if v is None:
         return None
     s = str(v).strip()
@@ -166,18 +144,16 @@ def validate_email_field(v: Any) -> Optional[str]:
         raise ValueError(f"Invalid email address: {e}")
 
 
-def validate_optional_text(v: Any) -> Optional[str]:
+def validate_insurance_id(v: Any) -> Optional[str]:
+    """Validate alphanumeric insurance member/subscriber ID if provided."""
     if v is None:
         return None
     s = str(v).strip()
-    return s if s else None
-
-
-def validate_language(v: Any) -> str:
-    if v is None:
-        return "English"
-    s = str(v).strip()
-    return s if s else "English"
+    if not s:
+        return None
+    if not re.match(r"^[a-zA-Z0-9-]+$", s):
+        raise ValueError("insurance_member_id must be alphanumeric (letters, numbers, hyphens)")
+    return s
 
 
 class SexEnum(str, Enum):
@@ -208,17 +184,20 @@ class PatientBase(SQLModel):
     @field_validator("first_name", "last_name", mode="before")
     @classmethod
     def validate_names(cls, v: Any, info) -> str:
-        return validate_name_field(v, info.field_name, required=True)
+        return validate_name(v, info.field_name)
 
     @field_validator("date_of_birth", mode="before")
     @classmethod
-    def validate_dob(cls, v: Any) -> date:
-        return validate_dob(v, required=True)
+    def validate_dob_field(cls, v: Any) -> date:
+        val = validate_dob(v)
+        if val is None:
+            raise ValueError("date_of_birth is required")
+        return val
 
     @field_validator("sex", mode="before")
     @classmethod
-    def validate_sex(cls, v: Any) -> SexEnum:
-        return validate_sex(v, required=True)
+    def validate_sex_field(cls, v: Any) -> SexEnum:
+        return validate_sex(v)
 
     @field_validator("phone_number", mode="before")
     @classmethod
@@ -233,45 +212,49 @@ class PatientBase(SQLModel):
     @field_validator("address_line_1", mode="before")
     @classmethod
     def validate_addr1(cls, v: Any) -> str:
-        return validate_address_line_1(v, required=True)
+        s = str(v).strip() if v is not None else ""
+        if not s:
+            raise ValueError("address_line_1 cannot be empty")
+        return s
 
     @field_validator("city", mode="before")
     @classmethod
     def validate_city(cls, v: Any) -> str:
-        return validate_city(v, required=True)
+        s = str(v).strip() if v is not None else ""
+        if not (1 <= len(s) <= 100):
+            raise ValueError("city must be between 1 and 100 characters")
+        return s
 
     @field_validator("state", mode="before")
     @classmethod
-    def validate_state(cls, v: Any) -> str:
-        return validate_state(v, required=True)
+    def validate_state_field(cls, v: Any) -> str:
+        return validate_state(v)
 
     @field_validator("zip_code", mode="before")
     @classmethod
-    def validate_zip(cls, v: Any) -> str:
-        return validate_zip(v, required=True)
+    def validate_zip_field(cls, v: Any) -> str:
+        return validate_zip(v)
 
     @field_validator("preferred_language", mode="before")
     @classmethod
     def validate_lang(cls, v: Any) -> str:
-        return validate_language(v)
+        return str(v).strip() if v else "English"
 
     @field_validator("emergency_contact_phone", mode="before")
     @classmethod
     def validate_emerg_phone(cls, v: Any) -> Optional[str]:
-        if not v:
-            return None
-        return normalize_us_phone(v, required=False)
+        return normalize_us_phone(v, required=False) if v else None
 
-    @field_validator(
-        "address_line_2",
-        "insurance_provider",
-        "insurance_member_id",
-        "emergency_contact_name",
-        mode="before",
-    )
+    @field_validator("insurance_member_id", mode="before")
+    @classmethod
+    def validate_insurance(cls, v: Any) -> Optional[str]:
+        return validate_insurance_id(v)
+
+    @field_validator("address_line_2", "insurance_provider", "emergency_contact_name", mode="before")
     @classmethod
     def validate_opt_text(cls, v: Any) -> Optional[str]:
-        return validate_optional_text(v)
+        s = str(v).strip() if v is not None else ""
+        return s if s else None
 
 
 class Patient(PatientBase, table=True):
@@ -320,91 +303,52 @@ class PatientUpdate(SQLModel):
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
 
-    @field_validator(
-        "first_name",
-        "last_name",
-        "date_of_birth",
-        "sex",
-        "phone_number",
-        "address_line_1",
-        "city",
-        "state",
-        "zip_code",
-        mode="before",
-    )
+    @field_validator("*", mode="before")
     @classmethod
-    def reject_null_required_fields(cls, v: Any, info) -> Any:
+    def validate_update_field(cls, v: Any, info) -> Any:
+        field_name = info.field_name
         if v is None:
-            raise ValueError(f"{info.field_name} cannot be null")
-        return v
-
-    @field_validator("first_name", "last_name", mode="before")
-    @classmethod
-    def validate_names(cls, v: Any, info) -> Optional[str]:
-        return validate_name_field(v, info.field_name, required=False)
-
-    @field_validator("date_of_birth", mode="before")
-    @classmethod
-    def validate_dob(cls, v: Any) -> Optional[date]:
-        return validate_dob(v, required=False)
-
-    @field_validator("sex", mode="before")
-    @classmethod
-    def validate_sex(cls, v: Any) -> Optional[SexEnum]:
-        return validate_sex(v, required=False)
-
-    @field_validator("phone_number", mode="before")
-    @classmethod
-    def validate_phone(cls, v: Any) -> Optional[str]:
-        return normalize_us_phone(v, required=False)
-
-    @field_validator("email", mode="before")
-    @classmethod
-    def validate_email(cls, v: Any) -> Optional[str]:
-        return validate_email_field(v)
-
-    @field_validator("address_line_1", mode="before")
-    @classmethod
-    def validate_addr1(cls, v: Any) -> Optional[str]:
-        return validate_address_line_1(v, required=False)
-
-    @field_validator("city", mode="before")
-    @classmethod
-    def validate_city(cls, v: Any) -> Optional[str]:
-        return validate_city(v, required=False)
-
-    @field_validator("state", mode="before")
-    @classmethod
-    def validate_state(cls, v: Any) -> Optional[str]:
-        return validate_state(v, required=False)
-
-    @field_validator("zip_code", mode="before")
-    @classmethod
-    def validate_zip(cls, v: Any) -> Optional[str]:
-        return validate_zip(v, required=False)
-
-    @field_validator("preferred_language", mode="before")
-    @classmethod
-    def validate_lang(cls, v: Any) -> Optional[str]:
-        return validate_language(v) if v is not None else None
-
-    @field_validator("emergency_contact_phone", mode="before")
-    @classmethod
-    def validate_emerg_phone(cls, v: Any) -> Optional[str]:
-        if not v:
+            if field_name in REQUIRED_FIELDS:
+                raise ValueError(f"{field_name} cannot be null")
             return None
-        return normalize_us_phone(v, required=False)
 
-    @field_validator(
-        "address_line_2",
-        "insurance_provider",
-        "insurance_member_id",
-        "emergency_contact_name",
-        mode="before",
-    )
-    @classmethod
-    def validate_opt_text(cls, v: Any) -> Optional[str]:
-        return validate_optional_text(v)
+        if field_name in ("first_name", "last_name"):
+            return validate_name(v, field_name)
+        if field_name == "date_of_birth":
+            val = validate_dob(v)
+            if val is None:
+                raise ValueError("date_of_birth cannot be null")
+            return val
+        if field_name == "sex":
+            return validate_sex(v)
+        if field_name == "phone_number":
+            return normalize_us_phone(v, required=True)
+        if field_name == "email":
+            return validate_email_field(v)
+        if field_name == "address_line_1":
+            s = str(v).strip()
+            if not s:
+                raise ValueError("address_line_1 cannot be empty")
+            return s
+        if field_name == "city":
+            s = str(v).strip()
+            if not (1 <= len(s) <= 100):
+                raise ValueError("city must be between 1 and 100 characters")
+            return s
+        if field_name == "state":
+            return validate_state(v)
+        if field_name == "zip_code":
+            return validate_zip(v)
+        if field_name == "insurance_member_id":
+            return validate_insurance_id(v)
+        if field_name == "emergency_contact_phone":
+            return normalize_us_phone(v, required=False) if v else None
+        if field_name == "preferred_language":
+            return str(v).strip() if v else "English"
+        if field_name in ("address_line_2", "insurance_provider", "emergency_contact_name"):
+            s = str(v).strip()
+            return s if s else None
+        return v
 
 
 class PatientRead(PatientBase):

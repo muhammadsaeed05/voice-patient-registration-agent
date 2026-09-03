@@ -19,3 +19,7 @@ dependencies = [
 
 [project.scripts]
 voice-patient-registration-agent = "app.main:start"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

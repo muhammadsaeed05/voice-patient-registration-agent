@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     VAPI_ASSISTANT_ID: Optional[str] = None
     VAPI_PHONE_NUMBER: Optional[str] = None
 
+    # Railway Public Domain (used for webhook registration in Vapi)
+    RAILWAY_URL: Optional[str] = None
+
     # LLM Provider
     OPENAI_API_KEY: Optional[str] = None
 

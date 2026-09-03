@@ -54,7 +54,7 @@ def create_app() -> FastAPI:
         error_summary = "; ".join(error_messages)
         logger.warning(f"Validation error on {request.method} {request.url.path}: {error_summary}")
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={"data": None, "error": f"Validation error: {error_summary}"},
         )
 
