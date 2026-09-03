@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Generator
 
 from sqlalchemy import event
-from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from .config import settings

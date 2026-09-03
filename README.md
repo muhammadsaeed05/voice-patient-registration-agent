@@ -25,10 +25,10 @@ A production-grade, end-to-end Voice AI Patient Intake and Registration System b
 ### Flow Summary
 1. **Inbound Call**: Caller dials into the clinic's dedicated Vapi telephony number.
 2. **Speech Recognition**: Deepgram `nova-2` streams real-time speech-to-text with medical keyword formatting.
-3. **Conversational Reasoning**: OpenAI GPT-4o processes conversational turns as intake coordinator "Sarah".
-4. **Duplicate Prevention**: In early turns, Sarah calls `lookup_patient_by_phone` to identify existing patients.
+3. **Conversational Reasoning**: OpenAI GPT-4o processes conversational turns as intake coordinator "Clara".
+4. **Duplicate Prevention**: In early turns, Clara calls `lookup_patient_by_phone` to identify existing patients.
 5. **Confirmation Gate**: The agent reads back collected details and awaits verbal confirmation.
-6. **API Mutation & Persistence**: Sarah invokes `create_patient` or `update_patient` against the FastAPI backend, which validates fields server-side, logs payloads to stdout, and commits to persisted SQLite storage.
+6. **API Mutation & Persistence**: Clara invokes `create_patient` or `update_patient` against the FastAPI backend, which validates fields server-side, logs payloads to stdout, and commits to persisted SQLite storage.
 7. **Direct Querying**: Clinical staff can query, filter, update, or soft-delete patient records at any time via REST endpoints.
 
 ---
@@ -237,7 +237,7 @@ To prove that patient data persists across redeployments:
 1. **Call 1 (New Registration)**:
    - Call the clinic phone number.
    - Register a new patient (e.g. "Samantha Cruz", phone `(512) 555-4321`, DOB `1992-03-10`).
-   - Confirm Sarah reads back details and saves successfully.
+   - Confirm Clara reads back details and saves successfully.
 
 2. **Verify via REST API**:
    - Query your deployed API:
@@ -251,8 +251,8 @@ To prove that patient data persists across redeployments:
    - Wait until the new container passes health check on `/health`.
 
 4. **Call 2 (Persistence & Duplicate Check)**:
-   - Call from the same number or provide `(512) 555-4321` when Sarah asks for your phone number.
-   - **Verification Passed**: Sarah identifies Samantha immediately: *"Welcome back, Samantha! I see we already have an account on file for you. Are you calling today to update your information...?"*
+   - Call from the same number or provide `(512) 555-4321` when Clara asks for your phone number.
+   - **Verification Passed**: Clara identifies Samantha immediately: *"Welcome back, Samantha! I see we already have an account on file for you. Are you calling today to update your information...?"*
 
 ---
 
@@ -285,7 +285,7 @@ Given more engineering time, the following enhancements are prioritized:
 
 1. **PostgreSQL Migration**: Swap SQLite engine for async PostgreSQL (`asyncpg`) with Alembic database migrations.
 2. **Authentication & RBAC**: Implement OAuth2 / JWT bearer authentication for clinic administrators and signed webhook HMAC verification (`vapi-secret-key`) on `/tools/*` and `/api/vapi/webhook`.
-3. **Multilingual Support**: Add automated language detection in Vapi so Sarah can seamlessly switch to Spanish, Mandarin, or French and persist the caller's `preferred_language`.
+3. **Multilingual Support**: Add automated language detection in Vapi so Clara can seamlessly switch to Spanish, Mandarin, or French and persist the caller's `preferred_language`.
 4. **Appointment Scheduling Integration**: Expand the state machine to offer immediate appointment slot booking with EHR/calendar integrations (e.g. AthenaHealth, Epic, or Google Calendar) after registration.
 5. **Call Transcripts & Audio Recordings Storage**: Ingest Vapi end-of-call webhooks and persist encrypted audio recording URLs and formatted clinical dialogue summaries directly linked to the `patient_id`.
 6. **Clinical Admin Dashboard**: Build a Next.js / Tailwind management dashboard with real-time WebSocket feeds showing incoming registrations, patient search, and soft-delete restorations.
