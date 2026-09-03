@@ -11,21 +11,31 @@ from .models import Patient, SexEnum
 logger = logging.getLogger("voice_patient_agent.database")
 
 
-def _prepare_db_path(db_url: str) -> None:
+def _prepare_db_path(db_url: str) -> str:
     """Ensure directory exists for file-based SQLite databases."""
     if db_url.startswith("sqlite:///") and not db_url.startswith("sqlite:///:memory:"):
         path_str = db_url.replace("sqlite:///", "", 1)
         db_path = Path(path_str).expanduser()
         if not db_path.is_absolute():
             db_path = Path.cwd() / db_path
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Ensured SQLite database directory exists at: {db_path.parent}")
+        try:
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Ensured SQLite database directory exists at: {db_path.parent}")
+            return db_url
+        except OSError as e:
+            fallback_dir = Path.cwd() / "data"
+            fallback_dir.mkdir(parents=True, exist_ok=True)
+            logger.warning(
+                f"Could not create database directory at {db_path.parent} ({e}). Falling back to local directory {fallback_dir}"
+            )
+            return f"sqlite:///{fallback_dir}/patients.db"
+    return db_url
 
 
-_prepare_db_path(settings.DATABASE_URL)
+effective_db_url = _prepare_db_path(settings.DATABASE_URL)
 
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(settings.DATABASE_URL, echo=False, connect_args=connect_args)
+connect_args = {"check_same_thread": False} if effective_db_url.startswith("sqlite") else {}
+engine = create_engine(effective_db_url, echo=False, connect_args=connect_args)
 
 
 def get_session() -> Generator[Session, None, None]:
