@@ -39,7 +39,9 @@ def _extract_args(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.post("/tools/lookup_patient_by_phone", status_code=status.HTTP_200_OK, response_model=ResponseEnvelope[PatientLookupData])
+@router.post("/tools/lookup_patient_by_phone/", status_code=status.HTTP_200_OK, response_model=ResponseEnvelope[PatientLookupData])
 @router.post("/tools/lookup-patient-by-phone", status_code=status.HTTP_200_OK, response_model=ResponseEnvelope[PatientLookupData])
+@router.post("/tools/lookup-patient-by-phone/", status_code=status.HTTP_200_OK, response_model=ResponseEnvelope[PatientLookupData])
 def tool_lookup_patient_by_phone(
     payload: Dict[str, Any],
     session: Session = Depends(get_session),
@@ -65,7 +67,9 @@ def tool_lookup_patient_by_phone(
 
 
 @router.post("/tools/create_patient", status_code=status.HTTP_201_CREATED, response_model=ResponseEnvelope[PatientRead])
+@router.post("/tools/create_patient/", status_code=status.HTTP_201_CREATED, response_model=ResponseEnvelope[PatientRead])
 @router.post("/tools/create-patient", status_code=status.HTTP_201_CREATED, response_model=ResponseEnvelope[PatientRead])
+@router.post("/tools/create-patient/", status_code=status.HTTP_201_CREATED, response_model=ResponseEnvelope[PatientRead])
 def tool_create_patient(
     payload: Dict[str, Any],
     session: Session = Depends(get_session),
@@ -77,7 +81,9 @@ def tool_create_patient(
 
 
 @router.post("/tools/update_patient", status_code=status.HTTP_200_OK, response_model=ResponseEnvelope[PatientRead])
+@router.post("/tools/update_patient/", status_code=status.HTTP_200_OK, response_model=ResponseEnvelope[PatientRead])
 @router.post("/tools/update-patient", status_code=status.HTTP_200_OK, response_model=ResponseEnvelope[PatientRead])
+@router.post("/tools/update-patient/", status_code=status.HTTP_200_OK, response_model=ResponseEnvelope[PatientRead])
 def tool_update_patient(
     payload: Dict[str, Any],
     session: Session = Depends(get_session),
@@ -94,12 +100,14 @@ def tool_update_patient(
 
 
 @router.get("/api/vapi/webhook", status_code=status.HTTP_200_OK)
+@router.get("/api/vapi/webhook/", status_code=status.HTTP_200_OK)
 def vapi_webhook_probe():
     """Health/ping probe for Vapi server URL webhook."""
     return {"status": "ok", "message": "Vapi webhook endpoint is ready"}
 
 
 @router.post("/api/vapi/webhook", status_code=status.HTTP_200_OK)
+@router.post("/api/vapi/webhook/", status_code=status.HTTP_200_OK)
 async def vapi_server_webhook(
     request: Request,
     session: Session = Depends(get_session),
