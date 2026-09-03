@@ -93,6 +93,12 @@ def tool_update_patient(
     return update_patient(id=patient_id, patient_in=patient_update, session=session)
 
 
+@router.get("/api/vapi/webhook", status_code=status.HTTP_200_OK)
+def vapi_webhook_probe():
+    """Health/ping probe for Vapi server URL webhook."""
+    return {"status": "ok", "message": "Vapi webhook endpoint is ready"}
+
+
 @router.post("/api/vapi/webhook", status_code=status.HTTP_200_OK)
 async def vapi_server_webhook(
     request: Request,
@@ -102,7 +108,10 @@ async def vapi_server_webhook(
 
     Dispatches tool calls sent by Vapi in the `{ message: { type: 'tool-calls', toolCalls: [...] } }` format.
     """
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
     logger.info("Vapi Webhook Received: %s", json.dumps(body))
 
     message = body.get("message", {})
